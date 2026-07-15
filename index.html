@@ -437,7 +437,25 @@
       box-shadow:var(--shadow-lg);
       position:relative;
     }
-
+.companion-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .companion-row input[type="text"]{
+      margin-bottom:0;
+    }
+    .companion-remove{
+      flex-shrink:0;
+      width:38px;
+      height:38px;
+      border-radius:50%;
+      background:#f2e6cc;
+      color:var(--gold-deep);
+      font-weight:800;
+      font-size:1rem;
+    }
     .admin-panel{
       background:linear-gradient(180deg,#fffdf8 0%, #f9f2e6 100%);
       border-radius:30px;
@@ -955,14 +973,9 @@
         </div>
 
         <div class="hidden" id="companionsWrap">
-          <label for="companionsInput">¿Con quién vienes?</label>
-          <input
-            type="text"
-            id="companionsInput"
-            placeholder="Escribe los nombres de las personas que te acompañan"
-            autocomplete="off"
-          />
-          <p class="rsvp-help">Puedes separar los nombres por comas.</p>
+          <label>¿Con quién vienes?</label>
+          <div id="companionsList"></div>
+          <button class="btn btn-secondary" id="addCompanionBtn" type="button">+ Añadir otra persona</button>
         </div>
 
         <button class="btn btn-primary" id="continueBtn" type="button">Continuar</button>
@@ -1168,20 +1181,49 @@
       const goesSoloYes = document.getElementById('goesSoloYes');
       const goesSoloNo = document.getElementById('goesSoloNo');
       const companionsWrap = document.getElementById('companionsWrap');
-      const companionsInput = document.getElementById('companionsInput');
-      const whatsappNumber = '573023216726';
+      const companionsListEl = document.getElementById('companionsList');
+      const addCompanionBtn = document.getElementById('addCompanionBtn');
+      const whatsappNumber = '573052775278';
 
-      if(!overlay || !openBtn || !closeBtn || !continueBtn || !guestName || !step1 || !step2 || !guestTitle || !yesBtn || !noBtn) return;
+      if(!overlay || !openBtn || !closeBtn || !continueBtn || !guestName || !step1 || !step2 || !guestTitle || !yesBtn || !noBtn || !companionsListEl || !addCompanionBtn) return;
 
       let goesSolo = true;
       let isSubmittingRsvp = false;
 
-      function parseCompanions(raw){
-        return (raw || '')
-          .split(',')
-          .map(item => item.trim())
+      function createCompanionRow(){
+        const row = document.createElement('div');
+        row.className = 'companion-row';
+        row.innerHTML = `
+          <input type="text" class="companion-input" placeholder="Nombre del acompañante" autocomplete="off" />
+          <button type="button" class="companion-remove" aria-label="Eliminar acompañante">✕</button>
+        `;
+        return row;
+      }
+
+      function addCompanionRow(){
+        companionsListEl.appendChild(createCompanionRow());
+      }
+
+      function clearCompanionRows(){
+        companionsListEl.innerHTML = '';
+      }
+
+      function getCompanions(){
+        return Array.from(companionsListEl.querySelectorAll('.companion-input'))
+          .map(input => input.value.trim())
           .filter(Boolean);
       }
+
+      companionsListEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.companion-remove');
+        if(!btn) return;
+        btn.closest('.companion-row').remove();
+        if(!goesSolo && companionsListEl.children.length === 0){
+          addCompanionRow();
+        }
+      });
+
+      addCompanionBtn.addEventListener('click', addCompanionRow);
 
       function updateSoloUI(){
         goesSoloYes.classList.toggle('is-selected', goesSolo === true);
@@ -1191,7 +1233,7 @@
 
       function resetRsvpFlow(){
         guestName.value = '';
-        companionsInput.value = '';
+        clearCompanionRows();
         goesSolo = true;
         updateSoloUI();
         step1.classList.remove('hidden');
@@ -1220,20 +1262,23 @@
 
       goesSoloYes.addEventListener('click', () => {
         goesSolo = true;
-        companionsInput.value = '';
+        clearCompanionRows();
         updateSoloUI();
       });
 
       goesSoloNo.addEventListener('click', () => {
         goesSolo = false;
         updateSoloUI();
+        if(companionsListEl.children.length === 0){
+          addCompanionRow();
+        }
       });
 
       updateSoloUI();
 
       continueBtn.addEventListener('click', () => {
         const name = guestName.value.trim();
-        const companionsList = parseCompanions(companionsInput.value.trim());
+        const companionsNames = getCompanions();
 
         if(!name){
           alert('Escribe tu nombre antes de continuar.');
@@ -1241,9 +1286,8 @@
           return;
         }
 
-        if(!goesSolo && companionsList.length === 0){
+        if(!goesSolo && companionsNames.length === 0){
           alert('Escribe el nombre de las personas que te acompañan.');
-          companionsInput.focus();
           return;
         }
 
@@ -1254,19 +1298,19 @@
 
       function buildMessage(attendance){
         const name = guestName.value.trim();
-        const companionsList = goesSolo ? [] : parseCompanions(companionsInput.value.trim());
-        const totalPeople = 1 + companionsList.length;
+        const companionsNames = goesSolo ? [] : getCompanions();
+        const totalPeople = 1 + companionsNames.length;
 
-        if(companionsList.length === 0){
+        if(companionsNames.length === 0){
           return `Hola, soy ${name}. ${attendance} al baby shower de Salvador el 17 de agosto. Asistiré solo/a. Total asistentes: 1.`;
         }
 
-        return `Hola, soy ${name}. ${attendance} al baby shower de Salvador el 17 de agosto. Iré con: ${companionsList.join(', ')}. Total asistentes: ${totalPeople}.`;
+        return `Hola, soy ${name}. ${attendance} al baby shower de Salvador el 17 de agosto. Iré con: ${companionsNames.join(', ')}. Total asistentes: ${totalPeople}.`;
       }
 
       async function saveRsvp(status){
         const name = guestName.value.trim();
-        const companionsList = goesSolo ? [] : parseCompanions(companionsInput.value.trim());
+        const companionsNames = goesSolo ? [] : getCompanions();
 
         if(!name){
           return { error: new Error('Nombre vacío') };
@@ -1276,9 +1320,9 @@
           nombre: name,
           respuesta: status,
           fecha_respuesta: new Date().toISOString(),
-          va_solo: companionsList.length === 0,
-          acompanantes: companionsList.length ? companionsList.join(', ') : null,
-          total_personas: 1 + companionsList.length
+          va_solo: companionsNames.length === 0,
+          acompanantes: companionsNames.length ? companionsNames.join(', ') : null,
+          total_personas: 1 + companionsNames.length
         };
 
         const { error } = await supabaseClient
@@ -1290,7 +1334,7 @@
 
       async function goToWhatsapp(attendance, status){
         const name = guestName.value.trim();
-        const companionsList = goesSolo ? [] : parseCompanions(companionsInput.value.trim());
+        const companionsNames = goesSolo ? [] : getCompanions();
 
         if(isSubmittingRsvp) return;
 
@@ -1300,9 +1344,8 @@
           return;
         }
 
-        if(!goesSolo && companionsList.length === 0){
+        if(!goesSolo && companionsNames.length === 0){
           alert('Escribe el nombre de las personas que te acompañan.');
-          companionsInput.focus();
           return;
         }
 
